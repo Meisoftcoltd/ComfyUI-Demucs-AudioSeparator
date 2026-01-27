@@ -3,9 +3,10 @@ import torchaudio
 import os
 import json
 import numpy as np
+import inspect
 from pathlib import Path
 
-# Try to import folder_paths from ComfyUI
+# Try to import ComfyUI utilities
 try:
     import folder_paths
 except ImportError:
@@ -16,8 +17,17 @@ except ImportError:
         def get_output_directory():
             return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "output")
 
+try:
+    import comfy.utils
+    HAS_COMFY = True
+except ImportError:
+    HAS_COMFY = False
+
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
+
+# Global cache for models to support fast swapping and high RAM utilization
+_MODEL_CACHE = {}
 
 class DemucsProNode:
     @classmethod
@@ -25,8 +35,9 @@ class DemucsProNode:
         return {
             "required": {
                 "audio": ("AUDIO",),
-                "model": (["htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi", "mdxc", "mdxc_fb_ft"],),
+                "model": (["htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi", "mdx", "mdx_extra", "mdx_q", "mdx_extra_q", "mdxc", "mdxc_fb_ft"],),
                 "device": (["cuda", "cpu"],),
+                "precision": (["float32", "bfloat16", "float16"], {"default": "bfloat16"}),
                 "shifts": ("INT", {"default": 1, "min": 1, "max": 10}),
                 "overlap": ("FLOAT", {"default": 0.25, "min": 0.1, "max": 0.9, "step": 0.05}),
                 "split": ("BOOLEAN", {"default": True}),
@@ -42,9 +53,20 @@ class DemucsProNode:
     RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "JSON")
     RETURN_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano", "metadata")
     FUNCTION = "separate"
-    CATEGORY = "Audio/DemucsPro"
+    CATEGORY = "🎵 Audio/Separation"
 
-    def separate(self, audio, model, device, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
+    def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
+        global _MODEL_CACHE
+
+        # Handle model name mapping for compatibility with older workflows
+        model_map = {
+            "mdxc": "mdx_extra",
+            "mdxc_fb_ft": "mdx_extra_q"
+        }
+        model_name = model_map.get(model, model)
+
+        print(f"⚡ [Demucs Pro] Starting separation process with model: {model_name}")
+
         # Configure model path
         demucs_models_path = os.path.join(folder_paths.models_dir, "demucs")
         if not os.path.exists(demucs_models_path):
@@ -54,19 +76,38 @@ class DemucsProNode:
 
         # Determine device
         if device == "cuda" and not torch.cuda.is_available():
-            print("CUDA not available, falling back to CPU")
+            print("⚡ [Demucs Pro] CUDA not available, falling back to CPU")
             device = "cpu"
 
         device_obj = torch.device(device)
 
-        # Load model
-        print(f"Loading Demucs model: {model}...")
-        try:
-            model_inst = get_model(model)
-        except Exception as e:
-            raise RuntimeError(f"Failed to load Demucs model {model}: {str(e)}")
+        # Precision mapping
+        dtype = torch.float32
+        if precision == "float16":
+            dtype = torch.float16
+        elif precision == "bfloat16":
+            dtype = torch.bfloat16
 
-        model_inst.to(device_obj)
+        # Load or retrieve model from cache
+        if model_name in _MODEL_CACHE:
+            print(f"⚡ [Demucs Pro] Retrieving model '{model_name}' from cache...")
+            model_inst = _MODEL_CACHE[model_name]
+        else:
+            print(f"⚡ [Demucs Pro] Loading model '{model_name}'...")
+            try:
+                # Cache management: keep only 2 models to avoid excessive memory usage
+                if len(_MODEL_CACHE) >= 2:
+                    evict_key = next(iter(_MODEL_CACHE))
+                    print(f"⚡ [Demucs Pro] Evicting model '{evict_key}' from cache.")
+                    del _MODEL_CACHE[evict_key]
+
+                model_inst = get_model(model_name)
+                _MODEL_CACHE[model_name] = model_inst
+            except Exception as e:
+                raise RuntimeError(f"⚡ [Demucs Pro] Failed to load Demucs model {model_name}: {str(e)}")
+
+        # Move model to device and precision
+        model_inst.to(device_obj).to(dtype)
         model_inst.eval()
 
         # Prepare audio
@@ -77,48 +118,80 @@ class DemucsProNode:
         if waveform.dim() == 2:
             waveform = waveform.unsqueeze(0)
 
-        waveform = waveform.to(device_obj)
+        # Move waveform to device and precision
+        waveform = waveform.to(device_obj).to(dtype)
 
         # Resample if necessary
         if sr != model_inst.samplerate:
-            print(f"Resampling audio from {sr} to {model_inst.samplerate}...")
+            print(f"⚡ [Demucs Pro] Resampling audio from {sr} to {model_inst.samplerate}...")
             resampler = torchaudio.transforms.Resample(sr, model_inst.samplerate).to(device_obj)
             waveform = resampler(waveform)
 
+        # Progress bar integration
+        pbar = None
+        if HAS_COMFY:
+            pbar = comfy.utils.ProgressBar(100)
+
+        def progress_callback(info):
+            if pbar:
+                # Support various keys from different Demucs versions
+                # e.g., 'progress', 'shift', 'total', 'shift_idx'
+                total = info.get('total') or info.get('shifts') or shifts
+                current = info.get('shift') or info.get('shift_idx') or info.get('progress')
+
+                if isinstance(current, float) and current <= 1.0:
+                    pbar.update_absolute(int(current * 100))
+                elif total and current is not None:
+                    # current might be 0-indexed
+                    p_val = min(100, int((current + 1) / total * 100))
+                    pbar.update_absolute(p_val)
+
         # Apply model
-        print(f"Separating audio with {model} (shifts={shifts}, overlap={overlap}, split={split})...")
+        print(f"⚡ [Demucs Pro] Separating audio (shifts={shifts}, overlap={overlap}, split={split}, precision={precision})...")
         try:
             with torch.no_grad():
-                # apply_model expects [batch, channels, samples] or [channels, samples]
-                # It returns [batch, sources, channels, samples]
-                out = apply_model(model_inst, waveform, shifts=shifts, split=split, overlap=overlap, progress=True, device=device_obj)
+                # Check if the installed version of apply_model supports a callback
+                apply_kwargs = {
+                    "shifts": shifts,
+                    "split": split,
+                    "overlap": overlap,
+                    "progress": False,
+                    "device": device_obj,
+                }
+
+                sig = inspect.signature(apply_model)
+                if 'callback' in sig.parameters:
+                    apply_kwargs["callback"] = progress_callback
+
+                out = apply_model(model_inst, waveform, **apply_kwargs)
         except Exception as e:
-            raise RuntimeError(f"Error during Demucs inference: {str(e)}")
+            raise RuntimeError(f"⚡ [Demucs Pro] Error during Demucs inference: {str(e)}")
 
         # out shape: [batch, sources, channels, samples]
         sources = model_inst.sources
         results = {}
         for i, source_name in enumerate(sources):
+            # Convert back to float32 for output and move to CPU
             results[source_name] = {
-                "waveform": out[:, i, :, :].cpu(),
+                "waveform": out[:, i, :, :].to(torch.float32).cpu(),
                 "sample_rate": model_inst.samplerate
             }
 
-        # Helper to get stem or zeroed audio
+        # Helper to get stem or zeroed audio based on user selection
         def get_stem(name, enabled):
             if enabled and name in results:
                 return results[name]
             else:
-                # Return zeroed audio with same length and batch size
+                # Return zeroed audio with same length and batch size if stem is disabled or unavailable
                 batch_size = out.shape[0]
                 channels = out.shape[2]
                 samples = out.shape[3]
                 return {
-                    "waveform": torch.zeros((batch_size, channels, samples)),
+                    "waveform": torch.zeros((batch_size, channels, samples), dtype=torch.float32),
                     "sample_rate": model_inst.samplerate
                 }
 
-        # Map to outputs
+        # Map results to discrete outputs, respecting the boolean flags
         out_vocals = get_stem("vocals", vocals)
         out_drums = get_stem("drums", drums)
         out_bass = get_stem("bass", bass)
@@ -127,8 +200,9 @@ class DemucsProNode:
         out_piano = get_stem("piano", piano)
 
         metadata = {
-            "model": model,
+            "model": model_name,
             "device": str(device_obj),
+            "precision": precision,
             "shifts": shifts,
             "overlap": overlap,
             "split": split,
@@ -138,4 +212,5 @@ class DemucsProNode:
             "status": "success"
         }
 
+        print(f"⚡ [Demucs Pro] Separation completed successfully.")
         return (out_vocals, out_drums, out_bass, out_other, out_guitar, out_piano, metadata)
