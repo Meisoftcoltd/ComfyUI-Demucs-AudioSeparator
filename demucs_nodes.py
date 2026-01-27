@@ -19,6 +19,9 @@ except ImportError:
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
 
+# Global cache for Demucs models to support fast swapping
+_MODEL_CACHE = {}
+
 class DemucsProNode:
     @classmethod
     def INPUT_TYPES(cls):
@@ -42,7 +45,7 @@ class DemucsProNode:
     RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "JSON")
     RETURN_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano", "metadata")
     FUNCTION = "separate"
-    CATEGORY = "Audio/DemucsPro"
+    CATEGORY = "🎵 Audio/Separation"
 
     def separate(self, audio, model, device, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
         # Configure model path
@@ -54,17 +57,32 @@ class DemucsProNode:
 
         # Determine device
         if device == "cuda" and not torch.cuda.is_available():
-            print("CUDA not available, falling back to CPU")
+            print("⚡ CUDA not available, falling back to CPU")
             device = "cpu"
 
         device_obj = torch.device(device)
 
         # Load model
-        print(f"Loading Demucs model: {model}...")
-        try:
-            model_inst = get_model(model)
-        except Exception as e:
-            raise RuntimeError(f"Failed to load Demucs model {model}: {str(e)}")
+        global _MODEL_CACHE
+        if model in _MODEL_CACHE:
+            model_inst = _MODEL_CACHE[model]
+        else:
+            print(f"⚡ Loading Demucs model: {model}...")
+            try:
+                model_inst = get_model(model)
+            except Exception as e:
+                raise RuntimeError(f"Failed to load Demucs model {model}: {str(e)}")
+
+            # Optimizations for RTX 3090/Ampere
+            if device == "cuda":
+                model_inst.to(dtype=torch.bfloat16)
+
+            # Limit cache size to 2 models to prevent OOM
+            if len(_MODEL_CACHE) >= 2:
+                oldest_model = next(iter(_MODEL_CACHE))
+                del _MODEL_CACHE[oldest_model]
+
+            _MODEL_CACHE[model] = model_inst
 
         model_inst.to(device_obj)
         model_inst.eval()
@@ -81,12 +99,12 @@ class DemucsProNode:
 
         # Resample if necessary
         if sr != model_inst.samplerate:
-            print(f"Resampling audio from {sr} to {model_inst.samplerate}...")
+            print(f"⚡ Resampling audio from {sr} to {model_inst.samplerate}...")
             resampler = torchaudio.transforms.Resample(sr, model_inst.samplerate).to(device_obj)
             waveform = resampler(waveform)
 
         # Apply model
-        print(f"Separating audio with {model} (shifts={shifts}, overlap={overlap}, split={split})...")
+        print(f"⚡ Separating audio with {model} (shifts={shifts}, overlap={overlap}, split={split})...")
         try:
             with torch.no_grad():
                 # apply_model expects [batch, channels, samples] or [channels, samples]
