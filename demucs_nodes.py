@@ -19,7 +19,7 @@ except ImportError:
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
 
-class DemucsProNode:
+class DemucsAudioSeparator:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -42,7 +42,7 @@ class DemucsProNode:
     RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "JSON")
     RETURN_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano", "metadata")
     FUNCTION = "separate"
-    CATEGORY = "Audio/DemucsPro"
+    CATEGORY = "🎵 Audio/Separation"
 
     def separate(self, audio, model, device, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
         # Configure model path
@@ -54,13 +54,13 @@ class DemucsProNode:
 
         # Determine device
         if device == "cuda" and not torch.cuda.is_available():
-            print("CUDA not available, falling back to CPU")
+            print("⚡ CUDA not available, falling back to CPU")
             device = "cpu"
 
         device_obj = torch.device(device)
 
         # Load model
-        print(f"Loading Demucs model: {model}...")
+        print(f"⚡ Loading Demucs model: {model}...")
         try:
             model_inst = get_model(model)
         except Exception as e:
@@ -81,12 +81,12 @@ class DemucsProNode:
 
         # Resample if necessary
         if sr != model_inst.samplerate:
-            print(f"Resampling audio from {sr} to {model_inst.samplerate}...")
+            print(f"⚡ Resampling audio from {sr} to {model_inst.samplerate}...")
             resampler = torchaudio.transforms.Resample(sr, model_inst.samplerate).to(device_obj)
             waveform = resampler(waveform)
 
         # Apply model
-        print(f"Separating audio with {model} (shifts={shifts}, overlap={overlap}, split={split})...")
+        print(f"⚡ Separating audio with {model} (shifts={shifts}, overlap={overlap}, split={split})...")
         try:
             with torch.no_grad():
                 # apply_model expects [batch, channels, samples] or [channels, samples]

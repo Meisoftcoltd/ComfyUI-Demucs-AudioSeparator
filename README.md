@@ -1,4 +1,4 @@
-# ComfyUI-Demucs-Pro
+# ComfyUI-Demucs-AudioSeparator
 
 Nodo personalizado para ComfyUI que permite la separación de fuentes de audio utilizando la tecnología **Meta Demucs (v4)**. Ideal para extraer voces, baterías, bajos y otros instrumentos con alta fidelidad.
 
@@ -6,14 +6,14 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
 
 - **Soporte Demucs v4**: Incluye modelos Hybrid Transformer (HTDemucs).
 - **Separación de hasta 6 pistas**: Voces, Batería, Bajo, Otros, y soporte para Guitarra y Piano (en modelos compatibles).
-- **Optimizado para NVIDIA RTX 3090**: Aprovecha la aceleración CUDA para procesos ultrarrápidos.
+- **Aceleración CUDA**: Aprovecha la potencia de la GPU para procesos ultrarrápidos.
 - **Descarga Automática**: Los modelos se descargan automáticamente a `ComfyUI/models/demucs`.
 - **Estabilidad Mejorada**: Opción `split` para evitar errores de memoria (OOM) en audios largos.
 
 ## Instalación
 
 ### Vía ComfyUI Manager (Recomendado)
-1. Busca `ComfyUI-Demucs-Pro` en el Manager.
+1. Busca `ComfyUI-Demucs-AudioSeparator` en el Manager.
 2. Haz clic en Install.
 3. Reinicia ComfyUI.
 
@@ -21,7 +21,7 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
 1. Clona este repositorio en tu carpeta `custom_nodes`:
    ```bash
    cd ComfyUI/custom_nodes
-   git clone https://github.com/usuario/ComfyUI-Demucs-Pro
+   git clone https://github.com/usuario/ComfyUI-Demucs-AudioSeparator
    ```
 2. Instala las dependencias:
    ```bash
@@ -46,8 +46,7 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
 
 ## Recomendaciones de Hardware
 
-Para un rendimiento óptimo, se recomienda el uso de GPUs de gama alta:
-- **NVIDIA RTX 3090 / 4090**: Rendimiento excepcional, permitiendo procesar canciones completas en segundos con altos valores de `shifts`.
+Para un rendimiento óptimo, se recomienda el uso de GPUs con aceleración CUDA:
 - **VRAM**: Se recomienda al menos 8GB para modelos `htdemucs`. Si encuentras errores de memoria, asegúrate de tener activada la opción `split`.
 
 ## Reporte de Errores
