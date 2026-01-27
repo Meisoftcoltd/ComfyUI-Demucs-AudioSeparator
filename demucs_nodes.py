@@ -26,10 +26,7 @@ except ImportError:
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
 
-# Global cache for models to support fast swapping and high RAM utilization
-_MODEL_CACHE = {}
-
-class DemucsProNode:
+class DemucsAudioSeparator:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -55,18 +52,6 @@ class DemucsProNode:
     FUNCTION = "separate"
     CATEGORY = "🎵 Audio/Separation"
 
-    def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
-        global _MODEL_CACHE
-
-        # Handle model name mapping for compatibility with older workflows
-        model_map = {
-            "mdxc": "mdx_extra",
-            "mdxc_fb_ft": "mdx_extra_q"
-        }
-        model_name = model_map.get(model, model)
-
-        print(f"⚡ [Demucs Pro] Starting separation process with model: {model_name}")
-
         # Configure model path
         demucs_models_path = os.path.join(folder_paths.models_dir, "demucs")
         if not os.path.exists(demucs_models_path):
@@ -76,38 +61,19 @@ class DemucsProNode:
 
         # Determine device
         if device == "cuda" and not torch.cuda.is_available():
-            print("⚡ [Demucs Pro] CUDA not available, falling back to CPU")
+            print("⚡ CUDA not available, falling back to CPU")
             device = "cpu"
 
         device_obj = torch.device(device)
 
-        # Precision mapping
-        dtype = torch.float32
-        if precision == "float16":
-            dtype = torch.float16
-        elif precision == "bfloat16":
-            dtype = torch.bfloat16
+        # Load model
+        print(f"⚡ Loading Demucs model: {model}...")
+        try:
+            model_inst = get_model(model)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load Demucs model {model}: {str(e)}")
 
-        # Load or retrieve model from cache
-        if model_name in _MODEL_CACHE:
-            print(f"⚡ [Demucs Pro] Retrieving model '{model_name}' from cache...")
-            model_inst = _MODEL_CACHE[model_name]
-        else:
-            print(f"⚡ [Demucs Pro] Loading model '{model_name}'...")
-            try:
-                # Cache management: keep only 2 models to avoid excessive memory usage
-                if len(_MODEL_CACHE) >= 2:
-                    evict_key = next(iter(_MODEL_CACHE))
-                    print(f"⚡ [Demucs Pro] Evicting model '{evict_key}' from cache.")
-                    del _MODEL_CACHE[evict_key]
-
-                model_inst = get_model(model_name)
-                _MODEL_CACHE[model_name] = model_inst
-            except Exception as e:
-                raise RuntimeError(f"⚡ [Demucs Pro] Failed to load Demucs model {model_name}: {str(e)}")
-
-        # Move model to device and precision
-        model_inst.to(device_obj).to(dtype)
+        model_inst.to(device_obj)
         model_inst.eval()
 
         # Prepare audio
@@ -123,7 +89,7 @@ class DemucsProNode:
 
         # Resample if necessary
         if sr != model_inst.samplerate:
-            print(f"⚡ [Demucs Pro] Resampling audio from {sr} to {model_inst.samplerate}...")
+            print(f"⚡ Resampling audio from {sr} to {model_inst.samplerate}...")
             resampler = torchaudio.transforms.Resample(sr, model_inst.samplerate).to(device_obj)
             waveform = resampler(waveform)
 
@@ -147,7 +113,7 @@ class DemucsProNode:
                     pbar.update_absolute(p_val)
 
         # Apply model
-        print(f"⚡ [Demucs Pro] Separating audio (shifts={shifts}, overlap={overlap}, split={split}, precision={precision})...")
+        print(f"⚡ Separating audio with {model} (shifts={shifts}, overlap={overlap}, split={split})...")
         try:
             with torch.no_grad():
                 # Check if the installed version of apply_model supports a callback

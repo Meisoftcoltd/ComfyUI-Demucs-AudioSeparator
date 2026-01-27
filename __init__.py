@@ -1,11 +1,13 @@
-from .demucs_nodes import DemucsProNode
+from .demucs_nodes import DemucsAudioSeparator
 
 NODE_CLASS_MAPPINGS = {
-    "DemucsProNode": DemucsProNode
+    "DemucsAudioSeparator": DemucsAudioSeparator,
+    "DemucsProNode": DemucsAudioSeparator  # Legacy support
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "DemucsProNode": "⚡ Demucs Pro (Audio Separation) 🎵"
+    "DemucsAudioSeparator": "🎵 Demucs Audio Separator ⚡",
+    "DemucsProNode": "🎵 Demucs Audio Separator (Legacy) ⚡"
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
