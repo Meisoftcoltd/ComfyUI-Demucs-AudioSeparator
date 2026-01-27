@@ -1,4 +1,4 @@
-demucs
-torch
-torchaudio
+demucs>=4.0.0
+torch>=2.0.0
+torchaudio>=2.0.0
 numpy

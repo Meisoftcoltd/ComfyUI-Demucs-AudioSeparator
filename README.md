@@ -37,8 +37,9 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
   - `htdemucs_ft`: Versión fine-tuned del modelo estándar.
   - `htdemucs_6s`: Modelo de 6 pistas (incluye Guitarra y Piano).
   - `hdemucs_mmi`: Basado en HDemucs con mejoras.
-  - `mdxc` / `mdxc_fb_ft`: Modelos basados en Music Demixing Challenge.
+  - `mdx` / `mdx_extra`: Modelos basados en Music Demixing Challenge.
 - **device**: `cuda` para usar la GPU o `cpu`.
+- **precision**: `float32`, `bfloat16`, `float16`. `bfloat16` es recomendado para arquitecturas Ampere (RTX 3090/4090).
 - **shifts**: Número de predicciones aleatorias (mayor valor = mayor calidad, pero más lento). Recomendado: 1-5.
 - **overlap**: Solapamiento entre ventanas de procesamiento. Por defecto: 0.25.
 - **split**: Divide el audio en segmentos para ahorrar VRAM. Imprescindible para tarjetas con menos de 8GB o audios largos.
@@ -53,4 +54,4 @@ Para un rendimiento óptimo, se recomienda el uso de GPUs con aceleración CUDA:
 Si encuentras algún problema, por favor abre un *Issue* en el repositorio de GitHub detallando tu sistema operativo, modelo de GPU y el error obtenido.
 
 ---
-*Desarrollado para la comunidad de ComfyUI por un Senior Python Developer especializado en IA Multimedia.*
+*Desarrollado para la comunidad de ComfyUI por un Senior Python Developer especializado en IA Multimedia (⚡ Bolt Edition).*
