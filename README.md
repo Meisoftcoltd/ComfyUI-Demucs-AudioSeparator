@@ -6,7 +6,9 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
 
 - **Soporte Demucs v4**: Incluye modelos Hybrid Transformer (HTDemucs).
 - **Separación de hasta 6 pistas**: Voces, Batería, Bajo, Otros, y soporte para Guitarra y Piano (en modelos compatibles).
-- **Optimizado para NVIDIA RTX 3090**: Aprovecha la aceleración CUDA para procesos ultrarrápidos.
+- **Optimizado para NVIDIA RTX 3090**: Aprovecha la aceleración CUDA y soporte para precisiones optimizadas (**bfloat16/float16**).
+- **Caché Global de Modelos**: Los modelos se mantienen en memoria para un intercambio ultrarrápido.
+- **Barra de Progreso Nativa**: Integración completa con la barra de progreso de ComfyUI.
 - **Descarga Automática**: Los modelos se descargan automáticamente a `ComfyUI/models/demucs`.
 - **Estabilidad Mejorada**: Opción `split` para evitar errores de memoria (OOM) en audios largos.
 
@@ -37,8 +39,9 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
   - `htdemucs_ft`: Versión fine-tuned del modelo estándar.
   - `htdemucs_6s`: Modelo de 6 pistas (incluye Guitarra y Piano).
   - `hdemucs_mmi`: Basado en HDemucs con mejoras.
-  - `mdxc` / `mdxc_fb_ft`: Modelos basados en Music Demixing Challenge.
+  - `mdx` / `mdx_extra`: Modelos basados en Music Demixing Challenge.
 - **device**: `cuda` para usar la GPU o `cpu`.
+- **precision**: `float32`, `bfloat16`, `float16`. `bfloat16` es recomendado para arquitecturas Ampere (RTX 3090/4090).
 - **shifts**: Número de predicciones aleatorias (mayor valor = mayor calidad, pero más lento). Recomendado: 1-5.
 - **overlap**: Solapamiento entre ventanas de procesamiento. Por defecto: 0.25.
 - **split**: Divide el audio en segmentos para ahorrar VRAM. Imprescindible para tarjetas con menos de 8GB o audios largos.
@@ -48,10 +51,10 @@ Nodo personalizado para ComfyUI que permite la separación de fuentes de audio u
 
 Para un rendimiento óptimo, se recomienda el uso de GPUs de gama alta:
 - **NVIDIA RTX 3090 / 4090**: Rendimiento excepcional, permitiendo procesar canciones completas en segundos con altos valores de `shifts`.
-- **VRAM**: Se recomienda al menos 8GB para modelos `htdemucs`. Si encuentras errores de memoria, asegúrate de tener activada la opción `split`.
+- **VRAM**: Se recomienda al menos 8GB para modelos `htdemucs`. Si encuentras errores de memoria, asegúrate de tener activada la opción `split` y usar `bfloat16`.
 
 ## Reporte de Errores
 Si encuentras algún problema, por favor abre un *Issue* en el repositorio de GitHub detallando tu sistema operativo, modelo de GPU y el error obtenido.
 
 ---
-*Desarrollado para la comunidad de ComfyUI por un Senior Python Developer especializado en IA Multimedia.*
+*Desarrollado para la comunidad de ComfyUI por un Senior Python Developer especializado en IA Multimedia (⚡ Bolt Edition).*
