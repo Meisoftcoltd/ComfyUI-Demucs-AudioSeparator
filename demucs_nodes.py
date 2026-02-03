@@ -52,6 +52,15 @@ class DemucsAudioSeparator:
     FUNCTION = "separate"
     CATEGORY = "🎵 Audio/Separation"
 
+    def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
+        model_name = model
+        if precision == "bfloat16":
+            dtype = torch.bfloat16
+        elif precision == "float16":
+            dtype = torch.float16
+        else:
+            dtype = torch.float32
+
         # Configure model path
         demucs_models_path = os.path.join(folder_paths.models_dir, "demucs")
         if not os.path.exists(demucs_models_path):
