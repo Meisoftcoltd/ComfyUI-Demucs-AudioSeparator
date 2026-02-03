@@ -34,7 +34,7 @@ class DemucsAudioSeparator:
                 "audio": ("AUDIO",),
                 "model": (["htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi", "mdx", "mdx_extra", "mdx_q", "mdx_extra_q", "mdxc", "mdxc_fb_ft"],),
                 "device": (["cuda", "cpu"],),
-                "precision": (["float32", "bfloat16", "float16"], {"default": "bfloat16"}),
+                "precision": (["float32", "float16"], {"default": "float32"}),
                 "shifts": ("INT", {"default": 1, "min": 1, "max": 10}),
                 "overlap": ("FLOAT", {"default": 0.25, "min": 0.1, "max": 0.9, "step": 0.05}),
                 "split": ("BOOLEAN", {"default": True}),
@@ -54,9 +54,13 @@ class DemucsAudioSeparator:
 
     def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
         model_name = model
+
+        # Legacy support and safety check for bfloat16
         if precision == "bfloat16":
-            dtype = torch.bfloat16
-        elif precision == "float16":
+            print("⚠️ [Demucs Pro] BFloat16 not supported for FFT. Upgrading to Float32 for inference.")
+            precision = "float32"
+
+        if precision == "float16":
             dtype = torch.float16
         else:
             dtype = torch.float32
@@ -138,7 +142,8 @@ class DemucsAudioSeparator:
                 if 'callback' in sig.parameters:
                     apply_kwargs["callback"] = progress_callback
 
-                out = apply_model(model_inst, waveform, **apply_kwargs)
+                # Force float32 for inference to avoid cuFFT/BFloat16 issues
+                out = apply_model(model_inst, waveform.to(torch.float32), **apply_kwargs)
         except Exception as e:
             raise RuntimeError(f"⚡ [Demucs Pro] Error during Demucs inference: {str(e)}")
 
