@@ -98,7 +98,7 @@ class DemucsAudioSeparator:
             waveform = waveform.unsqueeze(0)
 
         # Move waveform to device and precision
-        waveform = waveform.to(device_obj).to(dtype)
+        waveform = waveform.to(device_obj).to(torch.float32)
 
         # Resample if necessary
         if sr != model_inst.samplerate:
