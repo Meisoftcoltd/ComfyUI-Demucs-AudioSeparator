@@ -97,7 +97,15 @@ class DemucsAudioSeparator:
         if waveform.dim() == 2:
             waveform = waveform.unsqueeze(0)
 
-        # Move waveform to device and precision
+        # --- FIX 1: MONO TO STEREO ---
+        # If audio has 1 channel, duplicate it to 2 (Demucs requires stereo input)
+        if waveform.shape[1] == 1:
+            print("⚡ Detected mono audio, converting to stereo for Demucs...")
+            waveform = waveform.repeat(1, 2, 1)
+
+        # --- FIX 2: PRECISION SAFETY ---
+        # Move to device BUT keep in float32 for resampling
+        # (Prevents "Input type HalfTensor vs Weight type FloatTensor" error)
         waveform = waveform.to(device_obj).to(torch.float32)
 
         # Resample if necessary
@@ -105,6 +113,9 @@ class DemucsAudioSeparator:
             print(f"⚡ Resampling audio from {sr} to {model_inst.samplerate}...")
             resampler = torchaudio.transforms.Resample(sr, model_inst.samplerate).to(device_obj)
             waveform = resampler(waveform)
+
+        # Convert to target precision (Note: apply_model might force float32 later for stability)
+        waveform = waveform.to(dtype)
 
         # Progress bar integration
         pbar = None
