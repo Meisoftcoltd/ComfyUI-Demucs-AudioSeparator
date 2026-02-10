@@ -97,11 +97,16 @@ class DemucsAudioSeparator:
         if waveform.dim() == 2:
             waveform = waveform.unsqueeze(0)
 
-        # --- FIX 1: MONO TO STEREO ---
-        # If audio has 1 channel, duplicate it to 2 (Demucs requires stereo input)
-        if waveform.shape[1] == 1:
+        # --- FIX 1: CHANNEL MANAGEMENT (MONO/STEREO/SURROUND) ---
+        # Demucs strictly requires 2 channels (stereo)
+        channels = waveform.shape[1]
+
+        if channels == 1:
             print("⚡ Detected mono audio, converting to stereo for Demucs...")
             waveform = waveform.repeat(1, 2, 1)
+        elif channels > 2:
+            print(f"⚡ Detected {channels} channels, clipping to stereo for Demucs...")
+            waveform = waveform[:, :2, :]
 
         # --- FIX 2: PRECISION SAFETY ---
         # Move to device BUT keep in float32 for resampling
