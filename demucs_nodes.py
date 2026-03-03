@@ -61,7 +61,20 @@ class LoadAudioDirectory:
         audios = []
         for file_path in audio_files:
             try:
-                waveform, sample_rate = torchaudio.load(file_path)
+                try:
+                    # Attempt 1: Force 'soundfile' backend to bypass the default torchcodec
+                    waveform, sample_rate = torchaudio.load(file_path, backend='soundfile')
+                except Exception as e:
+                    print(f"⚡ Warning: torchaudio failed (likely torchcodec issue). Falling back to librosa... Error: {e}")
+                    import librosa
+                    # Attempt 2: Use librosa which reads MP3s without relying on torchcodec
+                    audio_np, sample_rate = librosa.load(file_path, sr=None, mono=False)
+
+                    # Ensure shape is [channels, frames]
+                    if audio_np.ndim == 1:
+                        audio_np = np.expand_dims(audio_np, axis=0)
+
+                    waveform = torch.from_numpy(audio_np)
 
                 # Ensure float32 precision
                 waveform = waveform.to(torch.float32)
