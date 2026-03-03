@@ -26,6 +26,61 @@ except ImportError:
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
 
+class LoadAudioDirectory:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "directory_path": ("STRING", {"default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio",)
+    OUTPUT_IS_LIST = (True,)
+    FUNCTION = "load_directory"
+    CATEGORY = "🎵 Demucs-AudioSeparator ⚡"
+
+    def load_directory(self, directory_path):
+        if not os.path.isdir(directory_path):
+            raise ValueError(f"⚡ Directory not found: {directory_path}")
+
+        supported_exts = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+
+        audio_files = []
+        for file in sorted(os.listdir(directory_path)):
+            ext = os.path.splitext(file)[1].lower()
+            if ext in supported_exts:
+                audio_files.append(os.path.join(directory_path, file))
+
+        if not audio_files:
+            raise ValueError(f"⚡ No supported audio files found in directory: {directory_path}")
+
+        print(f"⚡ Loading {len(audio_files)} audio files from {directory_path}...")
+
+        audios = []
+        for file_path in audio_files:
+            try:
+                waveform, sample_rate = torchaudio.load(file_path)
+
+                # Ensure float32 precision
+                waveform = waveform.to(torch.float32)
+
+                # Add batch dimension to match standard audio format [batch, channels, samples]
+                if waveform.dim() == 2:
+                    waveform = waveform.unsqueeze(0)
+
+                audios.append({"waveform": waveform, "sample_rate": sample_rate})
+                print(f"⚡ Successfully loaded {os.path.basename(file_path)}")
+            except Exception as e:
+                print(f"⚡ Error loading {file_path}: {e}")
+
+        if not audios:
+            raise ValueError(f"⚡ Failed to load any audio files from {directory_path}")
+
+        return (audios,)
+
+
 class DemucsAudioSeparator:
     @classmethod
     def INPUT_TYPES(cls):
@@ -50,7 +105,7 @@ class DemucsAudioSeparator:
     RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "JSON")
     RETURN_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano", "metadata")
     FUNCTION = "separate"
-    CATEGORY = "🎵 Audio/Separation"
+    CATEGORY = "🎵 Demucs-AudioSeparator ⚡"
 
     def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
         model_name = model
