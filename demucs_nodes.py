@@ -112,15 +112,16 @@ class DemucsAudioSeparator:
                 "other": ("BOOLEAN", {"default": True}),
                 "guitar": ("BOOLEAN", {"default": False}),
                 "piano": ("BOOLEAN", {"default": False}),
+                "instrumental": ("BOOLEAN", {"default": True}),
             }
         }
 
-    RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "JSON")
-    RETURN_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano", "metadata")
+    RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "AUDIO", "JSON")
+    RETURN_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano", "instrumental", "metadata")
     FUNCTION = "separate"
     CATEGORY = "🎵 Demucs-AudioSeparator ⚡"
 
-    def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano):
+    def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano, instrumental):
         model_name = model
 
         # Legacy support and safety check for bfloat16
@@ -263,6 +264,27 @@ class DemucsAudioSeparator:
         out_guitar = get_stem("guitar", guitar)
         out_piano = get_stem("piano", piano)
 
+        if instrumental:
+            if "vocals" in results:
+                # Subtract vocals from original resampled waveform
+                inst_waveform = waveform.cpu() - results["vocals"]["waveform"]
+            else:
+                # If the model doesn't output vocals, just return the original audio
+                inst_waveform = waveform.cpu()
+
+            out_instrumental = {
+                "waveform": inst_waveform.to(torch.float32),
+                "sample_rate": model_inst.samplerate
+            }
+        else:
+            batch_size = out.shape[0]
+            channels = out.shape[2]
+            samples = out.shape[3]
+            out_instrumental = {
+                "waveform": torch.zeros((batch_size, channels, samples), dtype=torch.float32),
+                "sample_rate": model_inst.samplerate
+            }
+
         metadata = {
             "model": model_name,
             "device": str(device_obj),
@@ -277,4 +299,4 @@ class DemucsAudioSeparator:
         }
 
         print(f"⚡ [Demucs Pro] Separation completed successfully.")
-        return (out_vocals, out_drums, out_bass, out_other, out_guitar, out_piano, metadata)
+        return (out_vocals, out_drums, out_bass, out_other, out_guitar, out_piano, out_instrumental, metadata)
