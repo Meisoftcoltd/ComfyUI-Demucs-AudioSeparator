@@ -99,20 +99,20 @@ class DemucsAudioSeparator:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),
-                "model": (["htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi", "mdx", "mdx_extra", "mdx_q", "mdx_extra_q", "mdxc", "mdxc_fb_ft"],),
-                "device": (["cuda", "cpu"],),
-                "precision": (["float32", "float16"], {"default": "float32"}),
-                "shifts": ("INT", {"default": 1, "min": 1, "max": 10}),
-                "overlap": ("FLOAT", {"default": 0.25, "min": 0.1, "max": 0.9, "step": 0.05}),
-                "split": ("BOOLEAN", {"default": True}),
-                "vocals": ("BOOLEAN", {"default": True}),
-                "drums": ("BOOLEAN", {"default": True}),
-                "bass": ("BOOLEAN", {"default": True}),
-                "other": ("BOOLEAN", {"default": True}),
-                "guitar": ("BOOLEAN", {"default": False}),
-                "piano": ("BOOLEAN", {"default": False}),
-                "instrumental": ("BOOLEAN", {"default": True}),
+                "audio": ("AUDIO", {"tooltip": "El clip de audio a procesar."}),
+                "model": (["htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi", "mdx", "mdx_extra", "mdx_q", "mdx_extra_q", "mdxc", "mdxc_fb_ft"], {"tooltip": "El modelo de Demucs a utilizar para la separación."}),
+                "device": (["cuda", "cpu"], {"tooltip": "El dispositivo a usar para la inferencia. 'cuda' para GPU, 'cpu' para procesador."}),
+                "precision": (["float32", "float16"], {"default": "float32", "tooltip": "Precisión de los cálculos. 'float32' es más seguro, 'float16' es más rápido pero menos estable."}),
+                "shifts": ("INT", {"default": 1, "min": 1, "max": 10, "tooltip": "Número de predicciones aleatorias (mayor valor = mayor calidad, pero más lento)."}),
+                "overlap": ("FLOAT", {"default": 0.25, "min": 0.1, "max": 0.9, "step": 0.05, "tooltip": "Solapamiento entre ventanas de procesamiento. Por defecto: 0.25."}),
+                "split": ("BOOLEAN", {"default": True, "tooltip": "Divide el audio en segmentos para ahorrar memoria VRAM. Imprescindible para audios largos."}),
+                "vocals": ("BOOLEAN", {"default": True, "tooltip": "Extraer la pista de voces."}),
+                "drums": ("BOOLEAN", {"default": True, "tooltip": "Extraer la pista de batería."}),
+                "bass": ("BOOLEAN", {"default": True, "tooltip": "Extraer la pista de bajo."}),
+                "other": ("BOOLEAN", {"default": True, "tooltip": "Extraer otros instrumentos."}),
+                "guitar": ("BOOLEAN", {"default": False, "tooltip": "Extraer la pista de guitarra (solo modelos de 6 pistas)."}),
+                "piano": ("BOOLEAN", {"default": False, "tooltip": "Extraer la pista de piano (solo modelos de 6 pistas)."}),
+                "instrumental": ("BOOLEAN", {"default": True, "tooltip": "Extraer la pista instrumental (audio original sin voces)."}),
             }
         }
 
