@@ -106,6 +106,8 @@ class DemucsAudioSeparator:
                 "shifts": ("INT", {"default": 1, "min": 1, "max": 10}),
                 "overlap": ("FLOAT", {"default": 0.25, "min": 0.1, "max": 0.9, "step": 0.05}),
                 "split": ("BOOLEAN", {"default": True}),
+                "normalize": ("BOOLEAN", {"default": True}),
+                "gain_multiplier": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "vocals": ("BOOLEAN", {"default": True}),
                 "drums": ("BOOLEAN", {"default": True}),
                 "bass": ("BOOLEAN", {"default": True}),
@@ -121,7 +123,7 @@ class DemucsAudioSeparator:
     FUNCTION = "separate"
     CATEGORY = "🎵 Demucs-AudioSeparator ⚡"
 
-    def separate(self, audio, model, device, precision, shifts, overlap, split, vocals, drums, bass, other, guitar, piano, instrumental):
+    def separate(self, audio, model, device, precision, shifts, overlap, split, normalize, gain_multiplier, vocals, drums, bass, other, guitar, piano, instrumental):
         model_name = model
 
         # Legacy support and safety check for bfloat16
@@ -245,7 +247,21 @@ class DemucsAudioSeparator:
         # Helper to get stem or zeroed audio based on user selection
         def get_stem(name, enabled):
             if enabled and name in results:
-                return results[name]
+                stem_audio = results[name]
+                waveform = stem_audio["waveform"]
+
+                # 1. Apply Normalization
+                if normalize:
+                    max_val = torch.max(torch.abs(waveform))
+                    if max_val > 1e-8:
+                        waveform = waveform / max_val
+
+                # 2. Apply Gain
+                if gain_multiplier != 1.0:
+                    waveform = waveform * gain_multiplier
+
+                stem_audio["waveform"] = waveform
+                return stem_audio
             else:
                 # Return zeroed audio with same length and batch size if stem is disabled or unavailable
                 batch_size = out.shape[0]
@@ -271,6 +287,16 @@ class DemucsAudioSeparator:
             else:
                 # If the model doesn't output vocals, just return the original audio
                 inst_waveform = waveform.cpu()
+
+            # Apply Normalization
+            if normalize:
+                inst_max = torch.max(torch.abs(inst_waveform))
+                if inst_max > 1e-8:
+                    inst_waveform = inst_waveform / inst_max
+
+            # Apply Gain
+            if gain_multiplier != 1.0:
+                inst_waveform = inst_waveform * gain_multiplier
 
             out_instrumental = {
                 "waveform": inst_waveform.to(torch.float32),
